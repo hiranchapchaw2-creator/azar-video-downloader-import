@@ -1,8 +1,9 @@
 import asyncio
 import os
+import contextlib
 from pathlib import Path
 
-from aiogram import Bot, Dispatcher 
+from aiogram import Bot, Dispatcher
 
 from bot.handlers.start import router as start_router
 from bot.handlers.messages import router as messages_router
@@ -16,12 +17,6 @@ TOKEN_FILE = BASE_DIR / "api_key_bot.txt"
 
 
 def load_bot_token() -> str:
-    """
-    Load Telegram bot token from the environment or from `api_key_bot.txt`.
-
-    This keeps secrets out of the source code. In production, prefer
-    the BOT_TOKEN environment variable.
-    """
     token = os.getenv("BOT_TOKEN")
     if token:
         return token.strip()
@@ -29,18 +24,12 @@ def load_bot_token() -> str:
     if TOKEN_FILE.exists():
         return TOKEN_FILE.read_text(encoding="utf-8").strip()
 
-    raise RuntimeError("Bot token not found. Set BOT_TOKEN env var or create api_key_bot.txt")
+    raise RuntimeError(
+        "Bot token not found. Set BOT_TOKEN environment variable."
+    )
 
 
 async def main() -> None:
-    """
-    Application entrypoint.
-
-    - Configures logging
-    - Initializes Bot and Dispatcher
-    - Starts the background download worker
-    - Starts polling for updates
-    """
     logger = setup_logger()
 
     token = load_bot_token()
@@ -51,7 +40,6 @@ async def main() -> None:
     dp.include_router(messages_router)
     dp.include_router(callbacks_router)
 
-    # Start single background worker that will process the download queue
     worker_task = download_queue.start_worker(bot=bot)
     logger.info("Background download worker started")
 
@@ -59,20 +47,17 @@ async def main() -> None:
         logger.info("Starting bot polling")
         await dp.start_polling(bot)
     finally:
-        # Graceful shutdown
         logger.info("Shutting down...")
         worker_task.cancel()
+
         with contextlib.suppress(asyncio.CancelledError):
             await worker_task
+
         await bot.session.close()
 
 
 if __name__ == "__main__":
-    import contextlib
-
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        # Normal termination
         pass
-
