@@ -1,3 +1,4 @@
+
 from aiogram import Router, F
 from aiogram.types import Message
 
@@ -15,37 +16,33 @@ async def handle_text_message(message: Message) -> None:
     Entry point for all text messages.
 
     - Validates that the message contains a URL
-    - Detects the target platform (YouTube / Instagram)
+    - Detects the target platform
     - Stores URL in user session
-    - Shows interactive menu with options: Download video, Get description, Back, Cancel
+    - Shows interactive menu with options
     """
     text = (message.text or "").strip()
 
     if not is_valid_url(text):
         await message.reply(
-            "Welcome to Mohixtube Bot 🎬\n\n"
-            "Please send a valid Instagram or YouTube URL.\n"
-            "Example:\n"
-            "- https://www.youtube.com/watch?v=...\n"
-            "- https://www.instagram.com/reel/..."
+            "سلام! به ربات آذر خوش آمدید 🎬\n\n"
+            "لطفاً یک لینک معتبر از یکی از این پلتفرم‌ها بفرستید:\n"
+            "YouTube, Instagram, TikTok, Facebook, X"
         )
         return
 
     platform = detect_platform(text)
     if platform is None:
         await message.reply(
-            "Mohixtube Bot currently supports only Instagram and YouTube URLs.\n"
-            "Please send a link from these platforms."
+            "این لینک متعلق به پلتفرم‌های پشتیبانی‌شده نیست.\n"
+            "لطفاً لینک YouTube، Instagram، TikTok، Facebook یا X را بفرستید."
         )
         return
 
-    # Store URL in user session (per chat_id) so it persists across button clicks
     store_url(message.chat.id, text)
 
-    # Show interactive menu with buttons
     keyboard = build_video_menu_keyboard()
     await message.reply(
-        "What would you like to do with this link?",
+        f"لینک {platform.value} دریافت شد.\n"
+        "برای ادامه یکی از گزینه‌های زیر را انتخاب کنید:",
         reply_markup=keyboard,
     )
-
