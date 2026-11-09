@@ -1,12 +1,10 @@
+
 """
 URL analyzer service.
 
 Responsibility:
 - Basic validation that a string looks like a URL
-- Detection of supported platforms based on the URL
-
-The logic here is intentionally simple and easy to extend
-for future platforms (TikTok, Twitter, etc.).
+- Detection of supported video platforms
 """
 
 from __future__ import annotations
@@ -14,6 +12,7 @@ from __future__ import annotations
 import enum
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 
 class Platform(str, enum.Enum):
@@ -21,37 +20,54 @@ class Platform(str, enum.Enum):
 
     YOUTUBE = "youtube"
     INSTAGRAM = "instagram"
+    TIKTOK = "tiktok"
+    FACEBOOK = "facebook"
+    X = "x"
 
 
 _URL_REGEX = re.compile(
-    r"^(https?://)"
-    r"([\w\-\.]+)"
-    r"(:\d+)?"
-    r"(/[\w\-\.~:/?#[\]@!$&'()*+,;=%]*)?$",
+    r"^https?://[^\s]+$",
     re.IGNORECASE,
 )
 
 
 def is_valid_url(text: str) -> bool:
     """Return True if the input looks like a valid HTTP/HTTPS URL."""
-    return bool(_URL_REGEX.match(text.strip()))
+    text = text.strip()
+
+    if not _URL_REGEX.match(text):
+        return False
+
+    try:
+        parsed = urlparse(text)
+        return bool(parsed.hostname)
+    except ValueError:
+        return False
 
 
 def detect_platform(url: str) -> Optional[Platform]:
-    """
-    Detect which platform the URL belongs to.
+    """Detect the platform from the exact hostname."""
+    try:
+        hostname = (urlparse(url.strip()).hostname or "").lower()
+    except ValueError:
+        return None
 
-    Currently supports:
-    - YouTube (www.youtube.com, m.youtube.com, youtu.be, youtube.com/shorts)
-    - Instagram (instagram.com, www.instagram.com)
-    """
-    normalized = url.lower()
+    def matches(domain: str) -> bool:
+        return hostname == domain or hostname.endswith("." + domain)
 
-    if any(domain in normalized for domain in ("youtube.com", "youtu.be")):
+    if matches("youtube.com") or matches("youtu.be"):
         return Platform.YOUTUBE
 
-    if "instagram.com" in normalized:
+    if matches("instagram.com"):
         return Platform.INSTAGRAM
 
-    return None
+    if matches("tiktok.com"):
+        return Platform.TIKTOK
 
+    if matches("facebook.com") or matches("fb.watch"):
+        return Platform.FACEBOOK
+
+    if matches("x.com") or matches("twitter.com"):
+        return Platform.X
+
+    return None
