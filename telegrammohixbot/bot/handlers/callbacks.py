@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from aiogram import Router, F
@@ -87,9 +86,10 @@ async def handle_download_video(callback: CallbackQuery) -> None:
         Platform.YOUTUBE,
         Platform.INSTAGRAM,
         Platform.TIKTOK,
+        Platform.FACEBOOK,
     ):
         await callback.answer(
-            "Facebook downloading is not available yet.",
+            "Unsupported platform.",
             show_alert=True,
         )
         return
@@ -173,7 +173,7 @@ async def handle_get_description(callback: CallbackQuery) -> None:
         await callback.answer("Description extracted successfully")
 
     except Exception:
-        logger.exception("Error extracting video description")
+        logger.exception("Error extracting description")
 
         await callback.message.edit_text(
             "❌ An error occurred while extracting the description.\n\n"
