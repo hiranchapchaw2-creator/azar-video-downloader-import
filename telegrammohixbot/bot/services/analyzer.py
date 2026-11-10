@@ -1,12 +1,4 @@
 
-"""
-URL analyzer service.
-
-Responsibility:
-- Basic validation that a string looks like a URL
-- Detection of supported video platforms
-"""
-
 from __future__ import annotations
 
 import enum
@@ -16,13 +8,10 @@ from urllib.parse import urlparse
 
 
 class Platform(str, enum.Enum):
-    """Supported platforms."""
-
     YOUTUBE = "youtube"
     INSTAGRAM = "instagram"
     TIKTOK = "tiktok"
     FACEBOOK = "facebook"
-    X = "x"
 
 
 _URL_REGEX = re.compile(
@@ -32,7 +21,6 @@ _URL_REGEX = re.compile(
 
 
 def is_valid_url(text: str) -> bool:
-    """Return True if the input looks like a valid HTTP/HTTPS URL."""
     text = text.strip()
 
     if not _URL_REGEX.match(text):
@@ -46,7 +34,6 @@ def is_valid_url(text: str) -> bool:
 
 
 def detect_platform(url: str) -> Optional[Platform]:
-    """Detect the platform from the exact hostname."""
     try:
         hostname = (urlparse(url.strip()).hostname or "").lower()
     except ValueError:
@@ -66,8 +53,5 @@ def detect_platform(url: str) -> Optional[Platform]:
 
     if matches("facebook.com") or matches("fb.watch"):
         return Platform.FACEBOOK
-
-    if matches("x.com") or matches("twitter.com"):
-        return Platform.X
 
     return None
