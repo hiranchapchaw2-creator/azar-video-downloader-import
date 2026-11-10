@@ -1,8 +1,5 @@
 """
 Handlers for the /start command and its inline buttons.
-
-This module is responsible only for user interaction and messages,
-not for any downloading logic.
 """
 
 from __future__ import annotations
@@ -11,31 +8,28 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards.start_keyboard import StartCallbacks, build_start_keyboard
+from bot.keyboards.start_keyboard import (
+    StartCallbacks,
+    build_start_keyboard,
+)
 
 
 router = Router()
 
 
 START_MESSAGE = (
-    "👋 Welcome to Mohixtube Bot!\n\n"
-    "This bot can download videos from:\n\n"
-    "• Instagram Reels\n"
-    "• YouTube Videos\n"
-    "• YouTube Shorts\n\n"
-    "Just send the video link and I will download it for you.\n\n"
-    "⬇️ Send a link to get started."
+    "👋 Welcome to Azar Video Bot!\n\n"
+    "This bot supports video downloads from:\n\n"
+    "• YouTube Videos and Shorts\n"
+    "• Instagram Reels and Videos\n"
+    "• TikTok Videos\n"
+    "• Facebook Videos\n\n"
+    "Send a video link to get started. 🎬"
 )
 
 
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
-    """
-    Handle the /start command.
-
-    Sends a friendly welcome message and shows an inline keyboard
-    with common actions.
-    """
     await message.answer(
         START_MESSAGE,
         reply_markup=build_start_keyboard(),
@@ -43,55 +37,62 @@ async def handle_start(message: Message) -> None:
 
 
 @router.callback_query(F.data == StartCallbacks.DOWNLOAD)
-async def handle_start_download_button(callback: CallbackQuery) -> None:
-    """
-    📥 Download video button.
+async def handle_start_download_button(
+    callback: CallbackQuery,
+) -> None:
+    if callback.message is not None:
+        await callback.message.edit_text(
+            "📥 Please send a video link from one of these platforms:\n\n"
+            "• YouTube\n"
+            "• Instagram\n"
+            "• TikTok\n"
+            "• Facebook",
+            reply_markup=build_start_keyboard(),
+        )
 
-    Simply tells the user to send a video link.
-    """
-    await callback.message.edit_text(
-        "📥 Please send the video link you want to download.\n\n"
-        "Supported:\n"
-        "• Instagram Reels\n"
-        "• YouTube Videos\n"
-        "• YouTube Shorts",
-        reply_markup=build_start_keyboard(),
-    )
-    await callback.answer()  # Close loading state
+    await callback.answer()
 
 
 @router.callback_query(F.data == StartCallbacks.HOW_TO_USE)
-async def handle_start_how_to_use_button(callback: CallbackQuery) -> None:
-    """
-    ℹ️ How to use button.
-
-    Shows a short step-by-step guide.
-    """
+async def handle_start_how_to_use_button(
+    callback: CallbackQuery,
+) -> None:
     text = (
-        "ℹ️ How to use Mohixtube Bot:\n\n"
-        "1️⃣ Copy the video link from Instagram or YouTube.\n"
-        "2️⃣ Paste the link here in this chat.\n"
-        "3️⃣ Wait while I download and send the video to you.\n\n"
-        "⬇️ You can send a link now."
+        "ℹ️ How to use Azar Video Bot:\n\n"
+        "1️⃣ Copy a video link from a supported platform.\n"
+        "2️⃣ Send the link here.\n"
+        "3️⃣ Press the Download button.\n"
+        "4️⃣ Wait for the bot to process and send your video.\n\n"
+        "Supported platforms: YouTube, Instagram, TikTok and Facebook."
     )
-    await callback.message.edit_text(text, reply_markup=build_start_keyboard())
+
+    if callback.message is not None:
+        await callback.message.edit_text(
+            text,
+            reply_markup=build_start_keyboard(),
+        )
+
     await callback.answer()
 
 
 @router.callback_query(F.data == StartCallbacks.SUPPORTED)
-async def handle_start_supported_button(callback: CallbackQuery) -> None:
-    """
-    ❓ Supported platforms button.
-
-    Shows the currently supported platforms.
-    """
+async def handle_start_supported_button(
+    callback: CallbackQuery,
+) -> None:
     text = (
         "❓ Supported platforms:\n\n"
-        "• Instagram Reels (public)\n"
-        "• YouTube Videos\n"
-        "• YouTube Shorts\n\n"
-        "Send any of these links and Mohixtube Bot will download it for you."
+        "• YouTube Videos and Shorts\n"
+        "• Instagram Reels and Videos\n"
+        "• TikTok Videos\n"
+        "• Facebook Videos\n\n"
+        "Note: Private, restricted or login-protected videos "
+        "may not be downloadable."
     )
-    await callback.message.edit_text(text, reply_markup=build_start_keyboard())
-    await callback.answer()
 
+    if callback.message is not None:
+        await callback.message.edit_text(
+            text,
+            reply_markup=build_start_keyboard(),
+        )
+
+    await callback.answer()
