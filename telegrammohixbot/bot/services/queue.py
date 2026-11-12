@@ -1,8 +1,3 @@
-
-"""
-Async download queue and worker.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -20,7 +15,7 @@ from bot.downloaders.instagram import download_instagram_video
 from bot.downloaders.tiktok import download_tiktok_video
 from bot.downloaders.facebook import download_facebook_video
 
-from bot.utils.cleaner import ensure_download_dir
+from bot.utils.cleaner import ensure_download_dir, safe_unlink
 from bot.utils.logger import get_logger
 
 
@@ -33,7 +28,7 @@ class DownloadTask:
     platform: Platform
     chat_id: int
     status_message_id: int
-    original_message_id: int
+    original_message_id: Optional[int] = None
 
 
 class DownloadQueue:
@@ -61,6 +56,7 @@ class DownloadQueue:
 
         while True:
             task = await self._queue.get()
+            video_path = None
 
             try:
                 await bot.edit_message_text(
@@ -70,7 +66,8 @@ class DownloadQueue:
                 )
 
                 video_path = await self._download_video(
-                    task, download_dir
+                    task,
+                    download_dir,
                 )
 
                 await bot.edit_message_text(
@@ -87,10 +84,16 @@ class DownloadQueue:
                     reply_to_message_id=task.original_message_id,
                 )
 
+                video_path = None
+
             except Exception as exc:
                 logger.exception(
-                    "Error while processing task: %s", task
+                    "Error while processing task: %s",
+                    task,
                 )
+
+                if video_path is not None:
+                    safe_unlink(video_path)
 
                 try:
                     await bot.edit_message_text(
@@ -112,22 +115,26 @@ class DownloadQueue:
 
         if task.platform is Platform.YOUTUBE:
             return await download_youtube_video(
-                task.url, download_dir
+                task.url,
+                download_dir,
             )
 
         if task.platform is Platform.INSTAGRAM:
             return await download_instagram_video(
-                task.url, download_dir
+                task.url,
+                download_dir,
             )
 
         if task.platform is Platform.TIKTOK:
             return await download_tiktok_video(
-                task.url, download_dir
+                task.url,
+                download_dir,
             )
 
         if task.platform is Platform.FACEBOOK:
             return await download_facebook_video(
-                task.url, download_dir
+                task.url,
+                download_dir,
             )
 
         raise ValueError(
