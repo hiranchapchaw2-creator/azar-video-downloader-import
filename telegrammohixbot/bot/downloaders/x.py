@@ -17,6 +17,8 @@ logger = get_logger()
 def _download_x_sync(url: str, download_dir: Path) -> Path:
     download_id = uuid.uuid4().hex
 
+    download_dir.mkdir(parents=True, exist_ok=True)
+
     options: dict[str, Any] = {
         "format": "best[ext=mp4]/best",
         "outtmpl": str(
