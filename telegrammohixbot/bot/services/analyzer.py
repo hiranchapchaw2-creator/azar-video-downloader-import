@@ -1,78 +1,66 @@
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-from pathlib import Path
-from typing import Any
-
-from yt_dlp import YoutubeDL
-
-from bot.utils.logger import get_logger
+from enum import Enum
+from urllib.parse import urlsplit
 
 
-logger = get_logger()
+class Platform(Enum):
+    YOUTUBE = "YouTube"
+    INSTAGRAM = "Instagram"
+    TIKTOK = "TikTok"
+    FACEBOOK = "Facebook"
 
 
-def _download_x_sync(url: str, download_dir: Path) -> Path:
-    download_id = uuid.uuid4().hex
+def is_valid_url(url: str) -> bool:
+    if not url or not isinstance(url, str):
+        return False
 
-    options: dict[str, Any] = {
-        "format": (
-            "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
-            "/best[ext=mp4]/best"
-        ),
-        "merge_output_format": "mp4",
-        "outtmpl": str(
-            download_dir / f"{download_id}_%(id)s.%(ext)s"
-        ),
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "restrictfilenames": True,
-    }
+    try:
+        parsed = urlsplit(url.strip())
 
-    logger.info("Starting X video download")
-
-    with YoutubeDL(options) as ydl:
-        ydl.download([url])
-
-    downloaded_files = [
-        path
-        for path in download_dir.glob(f"{download_id}_*")
-        if path.is_file()
-        and path.suffix.lower() not in (
-            ".part",
-            ".ytdl",
-            ".temp",
-        )
-    ]
-
-    if not downloaded_files:
-        raise FileNotFoundError(
-            "X download finished but output file was not found"
+        return (
+            parsed.scheme in ("http", "https")
+            and bool(parsed.hostname)
+            and "." in parsed.hostname
         )
 
-    mp4_files = [
-        path for path in downloaded_files
-        if path.suffix.lower() == ".mp4"
-    ]
-
-    video_path = mp4_files[0] if mp4_files else downloaded_files[0]
-
-    logger.info("X video download finished: %s", video_path)
-
-    return video_path
+    except ValueError:
+        return False
 
 
-async def download_x_video(
-    url: str,
-    download_dir: Path,
-) -> Path:
-    download_dir.mkdir(parents=True, exist_ok=True)
+def detect_platform(url: str) -> Platform | None:
+    if not is_valid_url(url):
+        return None
 
-    return await asyncio.to_thread(
-        _download_x_sync,
-        url,
-        download_dir,
-    )
+    try:
+        hostname = (urlsplit(url.strip()).hostname or "").lower()
+    except ValueError:
+        return None
+
+    def matches_domain(domain: str) -> bool:
+        return (
+            hostname == domain
+            or hostname.endswith("." + domain)
+        )
+
+    if (
+        matches_domain("youtube.com")
+        or matches_domain("youtu.be")
+    ):
+        return Platform.YOUTUBE
+
+    if matches_domain("instagram.com"):
+        return Platform.INSTAGRAM
+
+    if matches_domain("tiktok.com"):
+        return Platform.TIKTOK
+
+    if (
+        matches_domain("facebook.com")
+        or matches_domain("fb.watch")
+        or matches_domain("fb.com")
+    ):
+        return Platform.FACEBOOK
+
+    return None
