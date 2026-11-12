@@ -1,15 +1,14 @@
+
 """
 Instagram Reels and public posts downloader using yt-dlp.
-
-This uses the yt-dlp Python API (no browser automation, no external services).
 """
 
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
-from typing import Any, Dict
-import time
+from typing import Any
 
 from yt_dlp import YoutubeDL
 
@@ -19,17 +18,19 @@ from bot.utils.logger import get_logger
 logger = get_logger()
 
 
-def _build_ydl_opts(download_dir: Path) -> Dict[str, Any]:
-    """
-    Build yt-dlp options for Instagram reels and posts.
-
-    - Best MP4 video + M4A audio merged
-    - MP4 output (Telegram-friendly)
-    """
+def _build_ydl_opts(
+    download_dir: Path,
+    download_id: str,
+) -> dict[str, Any]:
     return {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+        "format": (
+            "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+            "/best[ext=mp4]/best"
+        ),
         "merge_output_format": "mp4",
-        "outtmpl": str(download_dir / "%(title).80s.%(ext)s"),
+        "outtmpl": str(
+            download_dir / f"{download_id}_%(title).80s.%(ext)s"
+        ),
         "restrictfilenames": True,
         "noplaylist": True,
         "quiet": True,
@@ -38,46 +39,48 @@ def _build_ydl_opts(download_dir: Path) -> Dict[str, Any]:
 
 
 def _download_sync(url: str, download_dir: Path) -> Path:
-    """
-    Blocking part executed in a thread via asyncio.to_thread.
+    download_id = uuid.uuid4().hex
+    ydl_opts = _build_ydl_opts(download_dir, download_id)
 
-    Strategy:
-    - Snapshot files in download_dir before download
-    - Run yt-dlp
-    - Snapshot files after download
-    - The new file(s) are assumed to be the download output
-    """
-    before_files = set(download_dir.glob("*"))
-
-    ydl_opts = _build_ydl_opts(download_dir)
-    logger.info("Starting Instagram download for url=%s", url)
+    logger.info("Starting Instagram download")
 
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-    # Give ffmpeg a brief moment to finalize the file on disk
-    time.sleep(1)
+    downloaded_files = [
+        path
+        for path in download_dir.glob(f"{download_id}_*")
+        if path.is_file()
+        and path.suffix.lower() not in (".part", ".ytdl", ".temp")
+    ]
 
-    after_files = set(download_dir.glob("*"))
-    new_files = list(after_files - before_files)
+    if not downloaded_files:
+        raise FileNotFoundError(
+            "Instagram download finished but output file was not found"
+        )
 
-    if not new_files:
-        raise RuntimeError("yt-dlp finished but no output file found")
+    mp4_files = [
+        path for path in downloaded_files
+        if path.suffix.lower() == ".mp4"
+    ]
 
-    # Prefer mp4 output if multiple files were created
-    mp4_files = [f for f in new_files if f.suffix.lower() == ".mp4"]
-    downloaded_file = mp4_files[0] if mp4_files else new_files[0]
+    downloaded_file = (
+        mp4_files[0] if mp4_files else downloaded_files[0]
+    )
 
     logger.info("Instagram download finished: %s", downloaded_file)
+
     return downloaded_file
 
 
-async def download_instagram_video(url: str, download_dir: Path) -> Path:
-    """
-    Download an Instagram reel or public post to the given directory.
-
-    Executed via asyncio.to_thread so the event loop is not blocked.
-    """
+async def download_instagram_video(
+    url: str,
+    download_dir: Path,
+) -> Path:
     download_dir.mkdir(parents=True, exist_ok=True)
-    return await asyncio.to_thread(_download_sync, url, download_dir)
 
+    return await asyncio.to_thread(
+        _download_sync,
+        url,
+        download_dir,
+    )
