@@ -10,7 +10,12 @@ from bot.keyboards.video_menu import (
 from bot.services.analyzer import detect_platform, is_valid_url, Platform
 from bot.services.queue import download_queue, DownloadTask
 from bot.services.description_extractor import get_video_description
-from bot.services.url_storage import get_url, clear_url, has_url
+from bot.services.url_storage import (
+    get_url,
+    get_message_id,
+    clear_url,
+    has_url,
+)
 from bot.utils.message_splitter import split_message
 from bot.utils.logger import get_logger
 
@@ -65,6 +70,7 @@ async def handle_download_video(callback: CallbackQuery) -> None:
 
     chat_id = callback.message.chat.id
     url = get_url(chat_id)
+    original_message_id = get_message_id(chat_id)
 
     if not url or not is_valid_url(url):
         await callback.answer(
@@ -74,13 +80,6 @@ async def handle_download_video(callback: CallbackQuery) -> None:
         return
 
     platform = detect_platform(url)
-
-    if platform is None:
-        await callback.answer(
-            "Unsupported platform.",
-            show_alert=True,
-        )
-        return
 
     if platform not in (
         Platform.YOUTUBE,
@@ -106,7 +105,7 @@ async def handle_download_video(callback: CallbackQuery) -> None:
             platform=platform,
             chat_id=chat_id,
             status_message_id=message_id,
-            original_message_id=message_id,
+            original_message_id=original_message_id,
         )
 
         await download_queue.enqueue(task)
@@ -140,6 +139,7 @@ async def handle_get_description(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
         "⏳ Extracting video description..."
     )
+    await callback.answer()
 
     try:
         description = await get_video_description(url)
@@ -150,11 +150,17 @@ async def handle_get_description(callback: CallbackQuery) -> None:
                 "What would you like to do with this link?",
                 reply_markup=build_video_menu_keyboard(),
             )
-            await callback.answer("Description extraction failed")
             return
 
         prefix = "📝 Video Description:\n\n"
-        chunks = split_message(description, prefix=prefix)
+        continuation_prefix = (
+            "📝 Video Description (continued):\n\n"
+        )
+
+        chunks = split_message(
+            description,
+            prefix=continuation_prefix,
+        )
 
         await callback.message.edit_text(
             f"{prefix}{chunks[0]}"
@@ -162,15 +168,13 @@ async def handle_get_description(callback: CallbackQuery) -> None:
 
         for chunk in chunks[1:]:
             await callback.message.answer(
-                f"📝 Video Description (continued):\n\n{chunk}"
+                f"{continuation_prefix}{chunk}"
             )
 
         await callback.message.answer(
             "What would you like to do with this link?",
             reply_markup=build_video_menu_keyboard(),
         )
-
-        await callback.answer("Description extracted successfully")
 
     except Exception:
         logger.exception("Error extracting description")
@@ -180,4 +184,3 @@ async def handle_get_description(callback: CallbackQuery) -> None:
             "What would you like to do with this link?",
             reply_markup=build_video_menu_keyboard(),
         )
-        await callback.answer("Error occurred", show_alert=True)
