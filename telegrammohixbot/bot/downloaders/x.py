@@ -4,16 +4,20 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
+from typing import Any
 
-import yt_dlp
+from yt_dlp import YoutubeDL
+
+from bot.utils.logger import get_logger
 
 
-def _download_facebook(url: str, download_dir: Path) -> Path:
-    download_dir.mkdir(parents=True, exist_ok=True)
+logger = get_logger()
 
+
+def _download_x_sync(url: str, download_dir: Path) -> Path:
     download_id = uuid.uuid4().hex
 
-    options = {
+    options: dict[str, Any] = {
         "format": "best[ext=mp4]/best",
         "outtmpl": str(
             download_dir / f"{download_id}_%(id)s.%(ext)s"
@@ -21,46 +25,45 @@ def _download_facebook(url: str, download_dir: Path) -> Path:
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
-        "merge_output_format": "mp4",
+        "restrictfilenames": True,
     }
 
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(url, download=True)
-        video_path = Path(ydl.prepare_filename(info))
+    logger.info("Starting X video download")
 
-    if not video_path.exists():
-        mp4_path = video_path.with_suffix(".mp4")
+    with YoutubeDL(options) as ydl:
+        ydl.download([url])
 
-        if mp4_path.exists():
-            video_path = mp4_path
-        else:
-            candidates = [
-                path
-                for path in download_dir.glob(f"{download_id}_*")
-                if path.is_file()
-                and path.suffix.lower() not in (
-                    ".part",
-                    ".ytdl",
-                    ".temp",
-                )
-            ]
+    downloaded_files = [
+        path
+        for path in download_dir.glob(f"{download_id}_*")
+        if path.is_file()
+        and path.suffix.lower() not in (
+            ".part",
+            ".ytdl",
+            ".temp",
+        )
+    ]
 
-            if not candidates:
-                raise FileNotFoundError(
-                    "Downloaded Facebook video was not found"
-                )
+    if not downloaded_files:
+        raise FileNotFoundError(
+            "X video download finished but output file was not found"
+        )
 
-            video_path = candidates[0]
+    video_path = downloaded_files[0]
+
+    logger.info("X video download finished: %s", video_path)
 
     return video_path
 
 
-async def download_facebook_video(
+async def download_x_video(
     url: str,
     download_dir: Path,
 ) -> Path:
+    download_dir.mkdir(parents=True, exist_ok=True)
+
     return await asyncio.to_thread(
-        _download_facebook,
+        _download_x_sync,
         url,
         download_dir,
     )
