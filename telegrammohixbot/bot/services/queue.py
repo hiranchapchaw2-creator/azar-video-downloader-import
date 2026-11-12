@@ -15,7 +15,6 @@ from bot.downloaders.youtube import download_youtube_video
 from bot.downloaders.instagram import download_instagram_video
 from bot.downloaders.tiktok import download_tiktok_video
 from bot.downloaders.facebook import download_facebook_video
-from bot.downloaders.x import download_x_video
 
 from bot.utils.cleaner import ensure_download_dir, safe_unlink
 from bot.utils.logger import get_logger
@@ -132,11 +131,6 @@ class DownloadQueue:
 
         if task.platform is Platform.FACEBOOK:
             return await download_facebook_video(
-                task.url, download_dir
-            )
-
-        if task.platform is Platform.X:
-            return await download_x_video(
                 task.url, download_dir
             )
 
