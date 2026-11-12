@@ -11,13 +11,6 @@ router = Router()
 
 @router.message(F.text)
 async def handle_text_message(message: Message) -> None:
-    """
-    Entry point for all text messages.
-
-    Validates the URL, detects the platform,
-    stores the URL and displays the video menu.
-    """
-
     text = (message.text or "").strip()
 
     if not is_valid_url(text):
@@ -37,7 +30,11 @@ async def handle_text_message(message: Message) -> None:
         )
         return
 
-    store_url(message.chat.id, text)
+    store_url(
+        message.chat.id,
+        text,
+        message.message_id,
+    )
 
     keyboard = build_video_menu_keyboard()
 
