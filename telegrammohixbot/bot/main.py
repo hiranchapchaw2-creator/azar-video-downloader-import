@@ -1,3 +1,4 @@
+
 import asyncio
 import os
 import contextlib
@@ -17,16 +18,20 @@ TOKEN_FILE = BASE_DIR / "api_key_bot.txt"
 
 
 def load_bot_token() -> str:
-    token = os.getenv("BOT_TOKEN")
-    if token:
-        return token.strip()
+    """Load the Telegram bot token from the environment or token file."""
 
-    if TOKEN_FILE.exists():
-        return TOKEN_FILE.read_text(encoding="utf-8").strip()
+    token = os.getenv("BOT_TOKEN", "").strip()
 
-    raise RuntimeError(
-        "Bot token not found. Set BOT_TOKEN environment variable."
-    )
+    if not token and TOKEN_FILE.exists():
+        token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+
+    if not token:
+        raise RuntimeError(
+            "Bot token not found or empty. "
+            "Set BOT_TOKEN or add a valid token to api_key_bot.txt."
+        )
+
+    return token
 
 
 async def main() -> None:
@@ -48,6 +53,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         logger.info("Shutting down...")
+
         worker_task.cancel()
 
         with contextlib.suppress(asyncio.CancelledError):
