@@ -12,6 +12,7 @@ from typing import Any
 
 from yt_dlp import YoutubeDL
 
+from bot.utils.cleaner import safe_unlink
 from bot.utils.logger import get_logger
 
 
@@ -44,33 +45,51 @@ def _download_sync(url: str, download_dir: Path) -> Path:
 
     logger.info("Starting Instagram download")
 
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-    downloaded_files = [
-        path
-        for path in download_dir.glob(f"{download_id}_*")
-        if path.is_file()
-        and path.suffix.lower() not in (".part", ".ytdl", ".temp")
-    ]
+        downloaded_files = [
+            path
+            for path in download_dir.glob(f"{download_id}_*")
+            if path.is_file()
+            and path.suffix.lower() not in (
+                ".part",
+                ".ytdl",
+                ".temp",
+            )
+        ]
 
-    if not downloaded_files:
-        raise FileNotFoundError(
-            "Instagram download finished but output file was not found"
+        if not downloaded_files:
+            raise FileNotFoundError(
+                "Instagram download finished but output file was not found"
+            )
+
+        mp4_files = [
+            path
+            for path in downloaded_files
+            if path.suffix.lower() == ".mp4"
+        ]
+
+        downloaded_file = (
+            mp4_files[0] if mp4_files else downloaded_files[0]
         )
 
-    mp4_files = [
-        path for path in downloaded_files
-        if path.suffix.lower() == ".mp4"
-    ]
+        logger.info(
+            "Instagram download finished: %s",
+            downloaded_file,
+        )
 
-    downloaded_file = (
-        mp4_files[0] if mp4_files else downloaded_files[0]
-    )
+        return downloaded_file
 
-    logger.info("Instagram download finished: %s", downloaded_file)
+    except Exception:
+        logger.exception("Instagram download failed")
 
-    return downloaded_file
+        for path in download_dir.glob(f"{download_id}_*"):
+            if path.is_file():
+                safe_unlink(path)
+
+        raise
 
 
 async def download_instagram_video(
