@@ -30,13 +30,79 @@ def _build_ydl_opts(
         ),
         "merge_output_format": "mp4",
         "outtmpl": str(
-            download_dir / f"{download_id}_%(title).80s.%(ext)s"
+            download_dir / f"{download_id}_%(id)s.%(ext)s"
         ),
         "restrictfilenames": True,
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
     }
+
+
+def _find_downloaded_file(
+    info: dict[str, Any],
+    download_dir: Path,
+    download_id: str,
+    ydl: YoutubeDL,
+) -> Path:
+    possible_paths: list[Path] = []
+
+    filepath = info.get("filepath")
+    if filepath:
+        possible_paths.append(Path(filepath))
+
+    requested_downloads = info.get("requested_downloads") or []
+    for item in requested_downloads:
+        filepath = item.get("filepath")
+        if filepath:
+            possible_paths.append(Path(filepath))
+
+    prepared_path = Path(ydl.prepare_filename(info))
+    possible_paths.append(prepared_path)
+
+    for path in possible_paths:
+        if path.is_file():
+            return path
+
+        mp4_path = path.with_suffix(".mp4")
+        if mp4_path.is_file():
+            return mp4_path
+
+    candidates = [
+        path
+        for path in download_dir.glob(f"{download_id}_*")
+        if path.is_file()
+        and path.suffix.lower() not in (
+            ".part",
+            ".ytdl",
+            ".temp",
+        )
+    ]
+
+    mp4_files = [
+        path for path in candidates
+        if path.suffix.lower() == ".mp4"
+    ]
+
+    if len(mp4_files) == 1:
+        return mp4_files[0]
+
+    if len(mp4_files) > 1:
+        raise RuntimeError(
+            "Multiple MP4 output files found for one YouTube download"
+        )
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if not candidates:
+        raise FileNotFoundError(
+            "YouTube download finished but output file was not found"
+        )
+
+    raise RuntimeError(
+        "Could not identify a unique YouTube output file"
+    )
 
 
 def _download_sync(url: str, download_dir: Path) -> Path:
@@ -47,33 +113,19 @@ def _download_sync(url: str, download_dir: Path) -> Path:
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
 
-        downloaded_files = [
-            path
-            for path in download_dir.glob(f"{download_id}_*")
-            if path.is_file()
-            and path.suffix.lower() not in (
-                ".part",
-                ".ytdl",
-                ".temp",
+            if not info:
+                raise ValueError(
+                    "YouTube video information could not be extracted"
+                )
+
+            downloaded_file = _find_downloaded_file(
+                info,
+                download_dir,
+                download_id,
+                ydl,
             )
-        ]
-
-        if not downloaded_files:
-            raise FileNotFoundError(
-                "YouTube download finished but output file was not found"
-            )
-
-        mp4_files = [
-            path
-            for path in downloaded_files
-            if path.suffix.lower() == ".mp4"
-        ]
-
-        downloaded_file = (
-            mp4_files[0] if mp4_files else downloaded_files[0]
-        )
 
         logger.info(
             "YouTube download finished: %s",
