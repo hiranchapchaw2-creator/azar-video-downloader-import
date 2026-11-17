@@ -57,7 +57,7 @@ class DownloadQueue:
 
         while True:
             task = await self._queue.get()
-            video_path = None
+            video_path: Optional[Path] = None
 
             try:
                 await bot.edit_message_text(
@@ -87,7 +87,18 @@ class DownloadQueue:
 
                 video_path = None
 
-            except Exception as exc:
+            except asyncio.CancelledError:
+                logger.warning(
+                    "Download task cancelled: %s",
+                    task,
+                )
+
+                if video_path is not None:
+                    safe_unlink(video_path)
+
+                raise
+
+            except Exception:
                 logger.exception(
                     "Error while processing task: %s",
                     task,
@@ -100,7 +111,10 @@ class DownloadQueue:
                     await bot.edit_message_text(
                         chat_id=task.chat_id,
                         message_id=task.status_message_id,
-                        text=f"An error occurred: {exc}",
+                        text=(
+                            "❌ An error occurred while processing "
+                            "your video. Please try again."
+                        ),
                     )
                 except Exception:
                     logger.exception("Failed to notify user")
