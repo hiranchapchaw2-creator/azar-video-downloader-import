@@ -51,17 +51,11 @@ def _find_downloaded_file(
     if filepath:
         possible_paths.append(Path(filepath))
 
-    requested_downloads = info.get("requested_downloads") or []
-    for item in requested_downloads:
-        filepath = item.get("filepath")
-        if filepath:
-            possible_paths.append(Path(filepath))
-
     prepared_path = Path(ydl.prepare_filename(info))
     possible_paths.append(prepared_path)
 
     for path in possible_paths:
-        if path.is_file():
+        if path.is_file() and path.suffix.lower() == ".mp4":
             return path
 
         mp4_path = path.with_suffix(".mp4")
@@ -72,36 +66,19 @@ def _find_downloaded_file(
         path
         for path in download_dir.glob(f"{download_id}_*")
         if path.is_file()
-        and path.suffix.lower() not in (
-            ".part",
-            ".ytdl",
-            ".temp",
-        )
+        and path.suffix.lower() == ".mp4"
     ]
-
-    mp4_files = [
-        path for path in candidates
-        if path.suffix.lower() == ".mp4"
-    ]
-
-    if len(mp4_files) == 1:
-        return mp4_files[0]
-
-    if len(mp4_files) > 1:
-        raise RuntimeError(
-            "Multiple MP4 output files found for one YouTube download"
-        )
 
     if len(candidates) == 1:
         return candidates[0]
 
-    if not candidates:
-        raise FileNotFoundError(
-            "YouTube download finished but output file was not found"
+    if len(candidates) > 1:
+        raise RuntimeError(
+            "Multiple MP4 output files found for one YouTube download"
         )
 
-    raise RuntimeError(
-        "Could not identify a unique YouTube output file"
+    raise FileNotFoundError(
+        "Final YouTube MP4 output file was not found"
     )
 
 
