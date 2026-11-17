@@ -58,6 +58,7 @@ class DownloadQueue:
         while True:
             task = await self._queue.get()
             video_path: Optional[Path] = None
+            download_task: Optional[asyncio.Task[Path]] = None
 
             try:
                 await bot.edit_message_text(
@@ -66,10 +67,11 @@ class DownloadQueue:
                     text="⏳ Downloading...",
                 )
 
-                video_path = await self._download_video(
-                    task,
-                    download_dir,
+                download_task = asyncio.create_task(
+                    self._download_video(task, download_dir)
                 )
+
+                video_path = await asyncio.shield(download_task)
 
                 await bot.edit_message_text(
                     chat_id=task.chat_id,
@@ -88,10 +90,17 @@ class DownloadQueue:
                 video_path = None
 
             except asyncio.CancelledError:
-                logger.warning(
-                    "Download task cancelled: %s",
-                    task,
-                )
+                logger.warning("Download task cancelled: %s", task)
+
+                # Wait for the background download to finish.
+                # This allows us to find and remove its output file.
+                if download_task is not None:
+                    try:
+                        video_path = await download_task
+                    except Exception:
+                        logger.exception(
+                            "Background download failed during shutdown"
+                        )
 
                 if video_path is not None:
                     safe_unlink(video_path)
