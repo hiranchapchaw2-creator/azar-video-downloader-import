@@ -1,3 +1,4 @@
+
 """
 Uploader service for sending downloaded videos back to Telegram.
 """
@@ -24,28 +25,31 @@ async def upload_video_flow(
     reply_to_message_id: int | None = None,
 ) -> None:
     """
-    Complete upload flow:
-    - Send the video
-    - Update the status message
-    - Remove the temporary file from disk
+    Send the downloaded video to Telegram.
+
+    The temporary file is removed after a successful upload.
+    If an error occurs, the download queue handles cleanup.
     """
+
+    video = FSInputFile(str(video_path))
+
+    await bot.send_video(
+        chat_id=chat_id,
+        video=video,
+        caption="🎬 Download completed",
+        supports_streaming=True,
+        reply_to_message_id=reply_to_message_id,
+    )
+
+    safe_unlink(video_path)
+
     try:
-        video = FSInputFile(str(video_path))
-
-        await bot.send_video(
-            chat_id=chat_id,
-            video=video,
-            caption="🎬 Download completed",
-            supports_streaming=True,
-            reply_to_message_id=reply_to_message_id,
-        )
-
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message_id,
             text="✅ Download complete",
         )
-    finally:
-        # Ensure we always try to delete the file, even if sending fails.
-        safe_unlink(video_path)
-
+    except Exception:
+        logger.exception(
+            "Video was sent, but status message could not be updated."
+        )
